@@ -1,0 +1,26 @@
+{
+	"name": "tizi",
+	"version": "0.0.1",
+	"description": "JSX factory with component support written in TS",
+	"main": "dist/tizi.js",
+	"type": "module",
+	"scripts": {
+		"build": "tsc && tsc --declaration --emitDeclarationOnly --outFile dist/index.d.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/msssk/tizi.git"
+	},
+	"keywords": [
+		"typescript",
+		"jsx"
+	],
+	"author": "Mangala Khalsa",
+	"license": "ISC",
+	"devDependencies": {
+		"@typescript-eslint/eslint-plugin": "^5.57.1",
+		"@typescript-eslint/parser": "^5.57.1",
+		"eslint": "^8.37.0",
+		"typescript": "^5.0.3"
+	}
+}

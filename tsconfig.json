@@ -1,0 +1,11 @@
+{
+	"compilerOptions": {
+		"newLine": "LF",
+		"noImplicitAny": false,
+		"outDir": "dist",
+		"removeComments": true,
+		"strict": true,
+		"target": "ES6"
+	},
+	"include": [ "src/*.ts" ]
+}
