@@ -288,11 +288,6 @@ export function render<C extends Controller = Controller> (
 	return element;
 }
 
-export interface ElementRenderer<K extends keyof HTMLElementTagNameMap> {
-	(children?: Renderable | Renderable[]): HTMLElementTagNameMap[K];
-	(options?: ElementOptions, children?: Renderable | Renderable[]): HTMLElementTagNameMap[K];
-}
-
 export default function tizi<K extends keyof HTMLElementTagNameMap> (
 	tagName: K | Component,
 	options?: ElementOptions,

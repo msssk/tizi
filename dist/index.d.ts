@@ -42,31 +42,9 @@ declare module "tizi" {
     };
     export function Fragment(_: ElementOptions, children: Renderable[]): DocumentFragment;
     export function render<C extends Controller = Controller>(element: string | Node, options?: ElementOptions | ComponentOptions<HTMLElement> | RenderChildren, children?: RenderChildren, controller?: C): typeof element extends string ? Text : typeof element extends Node ? typeof element : unknown;
-    export interface ElementRenderer<K extends keyof HTMLElementTagNameMap> {
-        (children?: Renderable | Renderable[]): HTMLElementTagNameMap[K];
-        (options?: ElementOptions, children?: Renderable | Renderable[]): HTMLElementTagNameMap[K];
-    }
     declare function tizi<K extends keyof HTMLElementTagNameMap>(tagName: K | Component, options?: ElementOptions, ...children: Renderable[]): any;
     declare namespace tizi {
         var Fragment: typeof import("tizi").Fragment;
     }
     export default tizi;
-}
-declare module "tizi-elements" {
-    import { ElementRenderer } from "tizi";
-    export const a: ElementRenderer<"a">;
-    export const br: ElementRenderer<"br">;
-    export const button: ElementRenderer<"button">;
-    export const div: ElementRenderer<"div">;
-    export const hr: ElementRenderer<"hr">;
-    export const input: ElementRenderer<"input">;
-    export const kbd: ElementRenderer<"kbd">;
-    export const label: ElementRenderer<"label">;
-    export const main: ElementRenderer<"main">;
-    export const p: ElementRenderer<"p">;
-    export const section: ElementRenderer<"section">;
-    export const span: ElementRenderer<"span">;
-    export const table: ElementRenderer<"table">;
-    export const td: ElementRenderer<"td">;
-    export const tr: ElementRenderer<"tr">;
 }
