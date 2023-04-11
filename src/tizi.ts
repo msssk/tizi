@@ -1,39 +1,50 @@
+/* eslint-disable @typescript-eslint/no-namespace */
 declare global {
 	namespace JSX {
 		interface IntrinsicElements {
 			// TODO: element typing
-			[elementName: string]: any;
+			[elementName: string]: unknown;
 		}
 	}
 }
 
-export const emptyObject = Object.freeze(Object.create(null));
+/** A read-only empty object; convenience/optimization to use instead of literal `{}` */
+const emptyObject: Record<string, never> = Object.freeze(Object.create(null));
 
 export type Renderable = string | Node;
 export type RenderChildren = Renderable | Renderable[];
 
 /**
- * An object that exposes methods to manipulate a Component.
+ * A Component may optionally define a controller. The controller is not quite the Controller in MVC,
+ * rather it is the external API of the component. A ComponentRef will have all properties and methods
+ * of the Component's controller.
  */
-export interface Controller<E extends HTMLElement = HTMLElement> {
-	/**
-	 * A function that can be manually invoked to destroy the DOM element and perform any cleanup.
-	 * Cleanup (e.g. removing event listeners) should be performed in implementations of this method.
-	 */
-	destroy?(): void;
-
+export class Controller<E extends HTMLElement = HTMLElement> {
 	element?: E;
+	listenerRemovers: Array<() => void> = [];
+
+	/**
+	 * Destroy the DOM element and perform any cleanup.
+	 * Cleanup (e.g. removing event listeners) should be performed in implementations of this method.
+	 * The browser will garbage collect event listeners on destroyed nodes that are unreferenced.
+	 * tizi removes listeners registered with `on<EventName>` props in case there are any circular
+	 * references.
+	 */
+	destroy () {
+		this.listenerRemovers?.forEach(remove => remove());
+		this.element?.remove();
+	}
 }
 
-// These should generally not be used externally, but if you want to go ahead
+/** For internal use. A Ref stores the element on the RefElementSymbol property */
 export const RefElementSymbol = Symbol('RefElementSymbol');
+
+/** For internal use. A Ref stores the controller on the RefControllerSymbol property */
 export const RefControllerSymbol = Symbol('RefControllerSymbol');
 
 /**
- * An object that stores an element in `RefElementSymbol` and proxies the element's properties. The element is also
- * accessible on the `element` property (e.g. for direct equality comparisons). For the sake of convenience most
- * element properties can be accessed through the proxy. The proxy will bind functions to the element so they are
- * executed in the correct context.
+ * A Ref represents an element rendered by tizi. The ref is actually a proxy to the element. The element
+ * itself is accessible via `ref.element` which can be useful for equality comparison.
  */
 export type Ref<E extends HTMLElement = HTMLElement> = {
 	[RefElementSymbol]: E;
@@ -42,6 +53,7 @@ export type Ref<E extends HTMLElement = HTMLElement> = {
 };
 
 const RefPrototype = Object.create(null, {
+	// TODO: clone method probably needs improvement
 	clone: {
 		configurable: false,
 		enumerable: true,
@@ -90,8 +102,8 @@ export function createRef<T extends HTMLElement> (): T & Ref<T> {
 }
 
 /**
- * An object that stores an element in `RefElementSymbol` and a Controller in `RefControllerSymbol`
- * and proxies the Controller's properties
+ * A ComponentRef represents a component rendered by tizi. The ref is actually a proxy to the
+ * component's controller. The component's root element is accessible via `ref.element`.
  */
 export interface ComponentRef<C extends Controller<HTMLElement>> extends Ref {
 	[RefControllerSymbol]: C;
@@ -131,6 +143,9 @@ const ComponentRefPrototype = Object.create(null, {
 	},
 });
 
+/**
+ * Create a component ref that can be passed to a component's `ref` prop
+ */
 export function createComponentRef<C extends Controller<HTMLElement> = Controller<HTMLElement>> ():
 	C & ComponentRef<C> {
 	const ref = Object.create(ComponentRefPrototype);
@@ -165,30 +180,40 @@ export function createComponentRef<C extends Controller<HTMLElement> = Controlle
 	}) as C & ComponentRef<C>;
 }
 
-export type ComponentOptions<E extends HTMLElement, C extends Controller<E> = Controller<E>> = {
-	[key: string]: unknown;
+export interface ComponentOptions<E extends HTMLElement, C extends Controller<E> = Controller<E>> {
+	// [key: string]: unknown;
 	controller?: C;
-	ref?: Ref<E> | ComponentRef<C>;
-};
-
-/**
- * A function that returns an `HTMLElement`.
- * Should call `render(element, options, children)` to handle `options.controller`, `options.ref` and `children`
- */
-export interface Component {
-	<E extends HTMLElement, C extends Controller<E>>(options?: ComponentOptions<E, C>, children?: RenderChildren): E
+	// ref?: Ref<E> | ComponentRef<C>;
+	ref?: ComponentRef<C>;
 }
 
-function appendChild (parent: Node, child: Renderable) {
-	if (!child) {
-		return;
-	}
+/**
+ * A tizi component.
+ * Types:
+ *   * E: the root element rendered by the component
+ *   * C: the component's controller type (if there is a controller; `Controller<E>` if there is no controller)
+ *   * P: the component's props type
+ */
+export interface Component<
+	E extends HTMLElement,
+	C extends Controller<E> = Controller<E>,
+	P extends ComponentOptions<E, C> = ComponentOptions<E, C>,
+> {
+	(options?: P, children?: RenderChildren): E
+}
 
-	if (typeof child === 'string') {
-		child = document.createTextNode(child);
-	}
+function appendChild (parent: Node) {
+	return function (child: Renderable) {
+		if (!child) {
+			return;
+		}
 
-	parent.appendChild(child);
+		if (typeof child === 'string') {
+			child = document.createTextNode(child);
+		}
+
+		parent.appendChild(child);
+	};
 }
 
 export type ElementOptions = {
@@ -200,7 +225,7 @@ export type ElementOptions = {
 export function Fragment (_: ElementOptions, children: Renderable[]) {
 	const fragment = document.createDocumentFragment();
 	if (children.length) {
-		children.forEach(appendChild.bind(null, fragment));
+		children.forEach(appendChild(fragment));
 	}
 
 	return fragment;
@@ -209,7 +234,7 @@ export function Fragment (_: ElementOptions, children: Renderable[]) {
 const eventHandlerRegex = /^on[A-Z][a-zA-Z]+$/;
 const PREFIX_LENGTH = 2; // length of 'on' prefix in 'onClick'
 
-function applyOptions<E extends HTMLElement> (element: E, options: ElementOptions) {
+function applyOptions<E extends HTMLElement> (element: E, options: ElementOptions, controller?: Controller) {
 	Object.keys(options).forEach(function (key) {
 		const value = options[key];
 
@@ -219,12 +244,16 @@ function applyOptions<E extends HTMLElement> (element: E, options: ElementOption
 				[ value ]) as [EventListener, EventListenerOptions?];
 			const eventName = key.slice(PREFIX_LENGTH).toLowerCase();
 			element.addEventListener(eventName, eventListener, eventListenerOptions);
+
+			if (controller) {
+				controller.listenerRemovers.push(() => element.removeEventListener(eventName, eventListener));
+			}
 		}
 		else if (element.setAttribute && typeof value === 'string') {
 			element.setAttribute(key, value as string);
 		}
 		else {
-			(element as unknown as any)[key] = value;
+			element[key] = value;
 		}
 	});
 }
@@ -244,15 +273,16 @@ function isChild (child: unknown): child is Renderable {
  * `render(element, options)` or `render(element, children)`. If `controller` is specified all parameters must
  * be supplied.
  */
-export function render<C extends Controller = Controller> (
-	element: string | Node,
-	options?: ElementOptions | ComponentOptions<HTMLElement> | RenderChildren,
+function render (
+	element: Node,
+	options?: ElementOptions | RenderChildren,
 	children?: RenderChildren,
-	controller?: C
+	controller?: Controller,
 ): typeof element extends string ? Text : typeof element extends Node ? typeof element : unknown {
-	if (typeof element === 'string') {
-		element = document.createTextNode(element);
-	}
+	// if (typeof element === 'string') {
+	// 	console.log(`render called with string element: ${element}`);
+	// 	element = document.createTextNode(element);
+	// }
 
 	if (isChild(options)) {
 		children = options;
@@ -262,10 +292,10 @@ export function render<C extends Controller = Controller> (
 	const {
 		ref,
 		...elementOptions
-	} = options as ComponentOptions<HTMLElement>;
+	} = options as ElementOptions;
 
 	if (elementOptions && element.nodeType === element.ELEMENT_NODE) {
-		applyOptions(element as HTMLElement, elementOptions);
+		applyOptions(element as HTMLElement, elementOptions, controller);
 	}
 
 	if (ref && element.nodeType === element.ELEMENT_NODE) {
@@ -282,30 +312,40 @@ export function render<C extends Controller = Controller> (
 			children = [ children ];
 		}
 
-		children.forEach(appendChild.bind(null, element));
+		children.forEach(appendChild(element));
 	}
 
 	return element;
 }
 
 export default function tizi<K extends keyof HTMLElementTagNameMap> (
-	tagName: K | Component,
-	options?: ElementOptions,
+	tagNameOrComponent: K | Component<HTMLElementTagNameMap[K]>,
+	options?: ElementOptions | ComponentOptions<HTMLElementTagNameMap[K]>,
 	...children: Renderable[]
 ) {
 	const {
 		controller,
 		...elementOptions
 	} = (options || emptyObject) as ElementOptions;
-	let element;
 
-	if (typeof tagName === 'string') {
-		element = document.createElement(tagName);
-		render(element, elementOptions, children, controller as unknown as Controller<HTMLElement>);
+	// nested renders cause children to become a nested array, flatten it:
+	children = children.flat();
+
+	if (typeof tagNameOrComponent === 'string') {
+		const tagName = tagNameOrComponent;
+		const element = document.createElement(tagName);
+		render(
+			element,
+			elementOptions,
+			children,
+			controller as unknown as Controller<HTMLElementTagNameMap[K]>,
+		);
+
+		return element;
 	}
-	else {
-		element = tagName(options, children);
-	}
+
+	const componentFunction = tagNameOrComponent;
+	const element = componentFunction(options as ComponentOptions<HTMLElementTagNameMap[K]>, children);
 
 	return element;
 }

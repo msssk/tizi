@@ -1,5 +1,9 @@
 {
 	"compilerOptions": {
+		"lib": [
+			"DOM",
+			"ES2019"
+		],
 		"newLine": "LF",
 		"noImplicitAny": false,
 		"outDir": "dist",

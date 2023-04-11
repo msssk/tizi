@@ -2,16 +2,16 @@ declare module "tizi" {
     global {
         namespace JSX {
             interface IntrinsicElements {
-                [elementName: string]: any;
+                [elementName: string]: unknown;
             }
         }
     }
-    export const emptyObject: any;
     export type Renderable = string | Node;
     export type RenderChildren = Renderable | Renderable[];
-    export interface Controller<E extends HTMLElement = HTMLElement> {
-        destroy?(): void;
+    export class Controller<E extends HTMLElement = HTMLElement> {
         element?: E;
+        listenerRemovers: Array<() => void>;
+        destroy(): void;
     }
     export const RefElementSymbol: unique symbol;
     export const RefControllerSymbol: unique symbol;
@@ -27,13 +27,12 @@ declare module "tizi" {
         control(element: Controller['element'], controller?: C): void;
     }
     export function createComponentRef<C extends Controller<HTMLElement> = Controller<HTMLElement>>(): C & ComponentRef<C>;
-    export type ComponentOptions<E extends HTMLElement, C extends Controller<E> = Controller<E>> = {
-        [key: string]: unknown;
+    export interface ComponentOptions<E extends HTMLElement, C extends Controller<E> = Controller<E>> {
         controller?: C;
-        ref?: Ref<E> | ComponentRef<C>;
-    };
-    export interface Component {
-        <E extends HTMLElement, C extends Controller<E>>(options?: ComponentOptions<E, C>, children?: RenderChildren): E;
+        ref?: ComponentRef<C>;
+    }
+    export interface Component<E extends HTMLElement, C extends Controller<E> = Controller<E>, P extends ComponentOptions<E, C> = ComponentOptions<E, C>> {
+        (options?: P, children?: RenderChildren): E;
     }
     export type ElementOptions = {
         [key: string]: unknown;
@@ -41,8 +40,7 @@ declare module "tizi" {
         ref?: Ref | ComponentRef<Controller>;
     };
     export function Fragment(_: ElementOptions, children: Renderable[]): DocumentFragment;
-    export function render<C extends Controller = Controller>(element: string | Node, options?: ElementOptions | ComponentOptions<HTMLElement> | RenderChildren, children?: RenderChildren, controller?: C): typeof element extends string ? Text : typeof element extends Node ? typeof element : unknown;
-    declare function tizi<K extends keyof HTMLElementTagNameMap>(tagName: K | Component, options?: ElementOptions, ...children: Renderable[]): any;
+    declare function tizi<K extends keyof HTMLElementTagNameMap>(tagNameOrComponent: K | Component<HTMLElementTagNameMap[K]>, options?: ElementOptions | ComponentOptions<HTMLElementTagNameMap[K]>, ...children: Renderable[]): HTMLElementTagNameMap[K];
     declare namespace tizi {
         var Fragment: typeof import("tizi").Fragment;
     }

@@ -9,7 +9,17 @@ var __rest = (this && this.__rest) || function (s, e) {
         }
     return t;
 };
-export const emptyObject = Object.freeze(Object.create(null));
+const emptyObject = Object.freeze(Object.create(null));
+export class Controller {
+    constructor() {
+        this.listenerRemovers = [];
+    }
+    destroy() {
+        var _a, _b;
+        (_a = this.listenerRemovers) === null || _a === void 0 ? void 0 : _a.forEach(remove => remove());
+        (_b = this.element) === null || _b === void 0 ? void 0 : _b.remove();
+    }
+}
 export const RefElementSymbol = Symbol('RefElementSymbol');
 export const RefControllerSymbol = Symbol('RefControllerSymbol');
 const RefPrototype = Object.create(null, {
@@ -107,25 +117,27 @@ export function createComponentRef() {
         },
     });
 }
-function appendChild(parent, child) {
-    if (!child) {
-        return;
-    }
-    if (typeof child === 'string') {
-        child = document.createTextNode(child);
-    }
-    parent.appendChild(child);
+function appendChild(parent) {
+    return function (child) {
+        if (!child) {
+            return;
+        }
+        if (typeof child === 'string') {
+            child = document.createTextNode(child);
+        }
+        parent.appendChild(child);
+    };
 }
 export function Fragment(_, children) {
     const fragment = document.createDocumentFragment();
     if (children.length) {
-        children.forEach(appendChild.bind(null, fragment));
+        children.forEach(appendChild(fragment));
     }
     return fragment;
 }
 const eventHandlerRegex = /^on[A-Z][a-zA-Z]+$/;
 const PREFIX_LENGTH = 2;
-function applyOptions(element, options) {
+function applyOptions(element, options, controller) {
     Object.keys(options).forEach(function (key) {
         const value = options[key];
         if (eventHandlerRegex.test(key)) {
@@ -134,6 +146,9 @@ function applyOptions(element, options) {
                 [value]);
             const eventName = key.slice(PREFIX_LENGTH).toLowerCase();
             element.addEventListener(eventName, eventListener, eventListenerOptions);
+            if (controller) {
+                controller.listenerRemovers.push(() => element.removeEventListener(eventName, eventListener));
+            }
         }
         else if (element.setAttribute && typeof value === 'string') {
             element.setAttribute(key, value);
@@ -150,17 +165,14 @@ function isChild(child) {
     }
     return false;
 }
-export function render(element, options, children, controller) {
-    if (typeof element === 'string') {
-        element = document.createTextNode(element);
-    }
+function render(element, options, children, controller) {
     if (isChild(options)) {
         children = options;
         options = emptyObject;
     }
     const _a = options, { ref } = _a, elementOptions = __rest(_a, ["ref"]);
     if (elementOptions && element.nodeType === element.ELEMENT_NODE) {
-        applyOptions(element, elementOptions);
+        applyOptions(element, elementOptions, controller);
     }
     if (ref && element.nodeType === element.ELEMENT_NODE) {
         if ('control' in ref) {
@@ -174,20 +186,21 @@ export function render(element, options, children, controller) {
         if (!Array.isArray(children)) {
             children = [children];
         }
-        children.forEach(appendChild.bind(null, element));
+        children.forEach(appendChild(element));
     }
     return element;
 }
-export default function tizi(tagName, options, ...children) {
+export default function tizi(tagNameOrComponent, options, ...children) {
     const _a = (options || emptyObject), { controller } = _a, elementOptions = __rest(_a, ["controller"]);
-    let element;
-    if (typeof tagName === 'string') {
-        element = document.createElement(tagName);
+    children = children.flat();
+    if (typeof tagNameOrComponent === 'string') {
+        const tagName = tagNameOrComponent;
+        const element = document.createElement(tagName);
         render(element, elementOptions, children, controller);
+        return element;
     }
-    else {
-        element = tagName(options, children);
-    }
+    const componentFunction = tagNameOrComponent;
+    const element = componentFunction(options, children);
     return element;
 }
 tizi.Fragment = Fragment;
